@@ -1,6 +1,4 @@
 import pandas as pd
-import numpy as np
-
 
 # remove ,
 def converter(x):
@@ -9,8 +7,10 @@ def converter(x):
 
 converters = {"Impressions": converter}
 interactions_and_impressions = pd.read_csv(
-    '../input/interactions-and-impressions/interactions_and_impressions.csv',
-    converters=converters)
+    '/Users/alicebrugnoli/Desktop/dataset Recsys/interactions_and_impressions.csv',
+    sep=",",
+    dtype={0: int, 1: int, 3: int},
+    converters={2: converter})
 interactions_and_impressions.columns = ["UserID", "ItemID", "Impressions", "Data"]
 
 """""

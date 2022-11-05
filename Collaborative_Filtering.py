@@ -3,29 +3,32 @@ from Evaluation.Evaluator import *
 from Data_manager.split_train_validation_random_holdout import *
 from Recommender.Similarity.Compute_Similarity_Python import Compute_Similarity_Python
 
+# Replacing 1 with 0 and viceversa because when 0 the user has interacted with the item
+interactions_and_impressions["Data"] = interactions_and_impressions["Data"].replace([0, 1])
+
 # SPARSE MATRIX
 # See that the max ID of items and users is higher than the number of unique values -> empty profiles
 # We should remove empty indices, to do so we create a new mapping
+
 mapped_id, original_id = pd.factorize(interactions_and_impressions["UserID"].unique())
 user_original_ID_to_index = pd.Series(mapped_id, index=original_id)
 mapped_id, original_id = pd.factorize(interactions_and_impressions["ItemID"].unique())
 item_original_ID_to_index = pd.Series(mapped_id, index=original_id)
 
+
 # We now replace the IDs in the dataframe and we are ready to use the data.
 interactions_and_impressions["UserID"] = interactions_and_impressions["UserID"].map(user_original_ID_to_index)
 interactions_and_impressions["ItemID"] = interactions_and_impressions["ItemID"].map(item_original_ID_to_index)
 
-userID_unique = interactions_and_impressions["UserID"].unique()
-itemID_unique = interactions_and_impressions["ItemID"].unique()
 
 URM_all = sps.coo_matrix((interactions_and_impressions["Data"].values,
                          (interactions_and_impressions["UserID"].values, interactions_and_impressions["ItemID"].values)))
 
-URM_all.tocsr()
+URM_all = URM_all.tocsr()
 
 # SPLITTING
 URM_train, URM_test = split_train_in_two_percentage_global_sample(URM_all, train_percentage=0.80)
-URM_train, URM_validation = split_train_in_two_percentage_global_sample(URM_train, train_percentage=0.80)
+#URM_train, URM_validation = split_train_in_two_percentage_global_sample(URM_train, train_percentage=0.80)
 
 #evaluator_validation = EvaluatorHoldout(URM_validation, cutoff_list=[10])
 #evaluator_test = EvaluatorHoldout(URM_test, cutoff_list=[10])
@@ -57,7 +60,6 @@ class ItemKNNCFRecommender(object):
         user_profile = self.URM.indices[start_pos:end_pos]
         scores[user_profile] = -np.inf
         return scores
-"""""
 
 
 def precision(recommended_items, relevant_items):  # Precision: how many of the recommended items are relevant
@@ -99,23 +101,23 @@ def evaluate_algorithm(URM_test, recommender_object, at=5):
     MAP = cumulative_AP / num_eval
     print("Recommender results are: Precision = {:.4f}, Recall = {:.4f}, MAP = {:.4f}".format(
         cumulative_precision, cumulative_recall, MAP))
-
+"""
 
 class UserKNNCFRecommender:
 
     def __init__(self, URM):
         self.URM = URM
+        self.W_sparse = self.fit()
 
-    def fit(self, topK=50, shrink=100, normalize=True, similarity="cosine"):
-        print("1")
+    def fit(self, topK=15, shrink=10, normalize=True, similarity="cosine"):
         similarity_object = Compute_Similarity_Python(self.URM.T, shrink=shrink, topK=topK, normalize=normalize,
                                                       similarity=similarity)
         W_sparse = similarity_object.compute_similarity()
         return W_sparse
 
-    def recommend(self, user_id, at=None, exclude_seen=True):
+    def recommend(self, user_id, at, exclude_seen=True):
         # compute the scores using the dot product
-        scores = self.fit()[user_id, :].dot(self.URM).toarray().ravel()
+        scores = self.W_sparse[user_id, :].dot(self.URM).toarray().ravel()
         if exclude_seen:
             scores = self.filter_seen(user_id, scores)
         # rank items
@@ -130,5 +132,13 @@ class UserKNNCFRecommender:
         return scores
 
 
+def write_submission(user_id, items, f):
+    f.write(f"{user_id},{' '.join([str(item) for item in items])}\n")
+
+
 recommender = UserKNNCFRecommender(URM_train)
-evaluate_algorithm(URM_test, recommender)
+with open("./submission.csv", "w") as f:
+    for user_id in range(URM_test.shape[0]):
+        write_submission(user_id, recommender.recommend(user_id, 10), f)
+
+#evaluate_algorithm(URM_test, recommender)
