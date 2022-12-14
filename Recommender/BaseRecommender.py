@@ -121,7 +121,7 @@ class BaseRecommender(object):
 
 
     def recommend(self, user_id_array, cutoff = None, remove_seen_flag=True, items_to_compute = None,
-                  remove_top_pop_flag = False, remove_custom_items_flag = False, return_scores = False):
+                  remove_top_pop_flag = False, remove_custom_items_flag = False, return_scores = False, at=None):
 
         # If is a scalar transform it in a 1-cell array
         if np.isscalar(user_id_array):
@@ -145,7 +145,7 @@ class BaseRecommender(object):
             user_id = user_id_array[user_index]
 
             if remove_seen_flag:
-                scores_batch[user_index,:] = self._remove_seen_on_scores(user_id, scores_batch[user_index, :])
+                scores_batch[user_index, :] = self._remove_seen_on_scores(user_id, scores_batch[user_index, :])
 
 
         if remove_top_pop_flag:
@@ -185,7 +185,7 @@ class BaseRecommender(object):
 
         # Return single list for one user, instead of list of lists
         if single_user:
-            ranking_list = ranking_list[0]
+            ranking_list = ranking_list[0][:at]
 
 
         if return_scores:

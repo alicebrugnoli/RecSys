@@ -1,10 +1,20 @@
-import copy
-import sys
-import time
-from enum import Enum
+import numpy as np
+import scipy.sparse as sps
+import time, sys, copy
 import pandas as pd
-from Evaluation.metrics import *
+
+from enum import Enum
+
+from tqdm import tqdm
+
 from Utils.seconds_to_biggest_unit import seconds_to_biggest_unit
+
+from Evaluation.metrics import precision, precision_recall_min_denominator, recall, MAP, MAP_MIN_DEN, MRR, HIT_RATE, \
+    ndcg, arhr_all_hits, \
+    Novelty, Coverage_Item, Coverage_Item_HIT, Items_In_GT, _Metrics_Object, Coverage_User, Coverage_User_HIT, \
+    Users_In_GT, Gini_Diversity, Shannon_Entropy, Diversity_MeanInterList, \
+    Diversity_Herfindahl, AveragePopularity, Ratio_Diversity_Gini, Ratio_Diversity_Herfindahl, Ratio_Shannon_Entropy, \
+    Ratio_AveragePopularity, Ratio_Novelty
 
 
 class EvaluatorMetrics(Enum):
@@ -116,7 +126,9 @@ def _create_empty_metrics_dict(cutoff_list, n_items, n_users, URM_train, URM_tes
                     cutoff_dict[metric.value] = copy.deepcopy(diversity_similarity_object)
             else:
                 cutoff_dict[metric.value] = 0.0
+
         empty_dict[cutoff] = cutoff_dict
+
     return empty_dict
 
 
@@ -231,6 +243,7 @@ class Evaluator(object):
         self._n_users_evaluated = np.nan
 
     def _print(self, string):
+
         if self.verbose:
             print("{}: {}".format(self.EVALUATOR_NAME, string))
 
@@ -253,6 +266,7 @@ class Evaluator(object):
         results_dict = self._run_evaluation_on_selected_users(recommender_object, self.users_to_evaluate)
 
         if self._n_users_evaluated > 0:
+
             for cutoff in self.cutoff_list:
                 results_current_cutoff = results_dict[cutoff]
 
@@ -272,6 +286,8 @@ class Evaluator(object):
                         # F1 micro averaged: http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.104.8244&rep=rep1&type=pdf
                         results_current_cutoff[EvaluatorMetrics.F1.value] = 2 * (precision_ * recall_) / (
                                     precision_ + recall_)
+
+
         else:
             self._print("WARNING: No users had a sufficient number of relevant items")
 
@@ -443,7 +459,6 @@ class EvaluatorHoldout(Evaluator):
 
         # Start from -block_size to ensure it to be 0 at the first block
         user_batch_start = 0
-        user_batch_end = 0
 
         while user_batch_start < len(users_to_evaluate):
             user_batch_end = user_batch_start + block_size
@@ -454,12 +469,7 @@ class EvaluatorHoldout(Evaluator):
 
             # Compute predictions for a batch of users using vectorization, much more efficient than computing it one at a time
             recommended_items_batch_list, scores_batch = recommender_object.recommend(test_user_batch_array,
-                                                                                      remove_seen_flag=self.exclude_seen,
-                                                                                      cutoff=self.max_cutoff,
-                                                                                      remove_top_pop_flag=False,
-                                                                                      remove_custom_items_flag=self.ignore_items_flag,
-                                                                                      return_scores=True
-                                                                                      )
+                                                                                      return_scores=True)
 
             results_dict = self._compute_metrics_on_recommendation_list(test_user_batch_array=test_user_batch_array,
                                                                         recommended_items_batch_list=recommended_items_batch_list,
@@ -525,17 +535,11 @@ class EvaluatorNegativeItemSample(Evaluator):
         if self.ignore_items_flag:
             recommender_object.set_items_to_ignore(self.ignore_items_ID)
 
-        for test_user in users_to_evaluate:
+        for test_user in tqdm(users_to_evaluate):
             items_to_compute = self._get_user_specific_items_to_compute(test_user)
 
             recommended_items, all_items_predicted_ratings = recommender_object.recommend(np.atleast_1d(test_user),
-                                                                                          remove_seen_flag=self.exclude_seen,
-                                                                                          cutoff=self.max_cutoff,
-                                                                                          remove_top_pop_flag=False,
-                                                                                          items_to_compute=items_to_compute,
-                                                                                          remove_custom_items_flag=self.ignore_items_flag,
-                                                                                          return_scores=True
-                                                                                          )
+                                                                                          return_scores=True)
 
             results_dict = self._compute_metrics_on_recommendation_list(test_user_batch_array=[test_user],
                                                                         recommended_items_batch_list=recommended_items,
